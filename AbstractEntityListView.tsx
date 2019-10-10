@@ -53,13 +53,10 @@ export default abstract class AbstractEntityListView<T extends Entity,
 
     protected onSaveEntity(entity: T) {
         let entities: T[] = this.state.entities;
-        console.log(entities);
-        console.log(entity);
+        
         let idx = entities.findIndex(e => e.id == entity.id);
         entities[idx] = entity;
-        console.log(idx);
-        console.log(entities);
-
+        
         this.setState({
             entities: entities
         })
