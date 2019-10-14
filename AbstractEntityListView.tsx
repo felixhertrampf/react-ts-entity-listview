@@ -1,6 +1,6 @@
-import {Button, Container, Table, TableBody, TableHeader} from "semantic-ui-react";
-import React, {ReactElement} from "react";
-import AbstractJpaRestService from "./AbstractJpaRestService";
+import {Button, Container, Table, TableBody, TableHeader, TableRow} from "semantic-ui-react";
+import React, {ReactElement, RefObject} from "react";
+import AbstractRestService from "./AbstractRestService";
 import Entity from "./Entity";
 import AbstractEntityModal, {EntityModalProps, EntityModalState} from "./AbstractEntityModal";
 
@@ -8,7 +8,7 @@ export interface EntityListViewProps {
     addEntityButtonTitle: string
 }
 
-export interface EntityListViewState<T> {
+export interface EntityListViewState<T extends Entity> {
     entities: T[]
 }
 
@@ -17,23 +17,23 @@ export default abstract class AbstractEntityListView<T extends Entity,
     ID,
     P extends EntityListViewProps,
     S extends EntityListViewState<T>,
-    A extends AbstractJpaRestService<T, ID>,
+    R extends AbstractRestService<T, ID>,
     MP extends EntityModalProps, MS extends EntityModalState<T>,
     M extends AbstractEntityModal<T, MP, MS>>
+
     extends React.Component<P, S> {
-    protected readonly entityService: A;
-    protected readonly entityModalRef: React.RefObject<M>;
+    protected readonly entityService: R;
     protected readonly entityModal: ReactElement<M>;
+    protected readonly entityModalRef: RefObject<M>;
 
     protected constructor(props: P) {
         super(props);
         this.state = this.initState();
 
-        this.configureModal = this.configureModal.bind(this);
-        this.renderEntityRow = this.renderEntityRow.bind(this);
         this.onSaveEntity = this.onSaveEntity.bind(this);
 
         this.entityService = this.initService();
+
         this.entityModalRef = React.createRef();
         this.entityModal = this.initModal();
 
@@ -44,33 +44,12 @@ export default abstract class AbstractEntityListView<T extends Entity,
             .then(value => this.setState({entities: value}));
     }
 
-    protected abstract initState(): S
-
-    protected abstract initService(): A
-
-    protected abstract initModal(): ReactElement<M>
-
-    protected abstract entityGenerator(): T
-
-    protected onSaveEntity(entity: T) {
-        let entities: T[] = this.state.entities;
-
-        let idx = entities.findIndex(e => e.id == entity.id);
-        entities[idx] = entity;
-
-        this.setState({
-            entities: entities
-        })
-    }
-
     render() {
         return ([
             <Container textAlign={"right"}>
                 <Button
                     primary
-                    onClick={e => {
-                        this.configureModal(e)
-                    }}>
+                    onClick={() => this.configureModal()}>
                     {this.props.addEntityButtonTitle}
                 </Button>
             </Container>,
@@ -83,30 +62,42 @@ export default abstract class AbstractEntityListView<T extends Entity,
         ])
     }
 
-    abstract renderTableHeader(): ReactElement<typeof TableHeader>
+    abstract renderTableHeader: () => ReactElement<typeof TableHeader>;
 
-    renderTableBody(): ReactElement<typeof TableBody> {
-        return (
-            <TableBody>
-                {
-                    this.state.entities.map(this.renderEntityRow)
-                }
-            </TableBody>
-        )
-    }
+    renderTableBody = (): ReactElement<typeof TableBody> =>
+        <TableBody>
+            {this.state.entities.map(this.renderEntityRow)}
+        </TableBody>;
 
-    abstract renderEntityRow(entity: T): ReactElement<typeof TableHeader>
+    abstract renderEntityRow: (entity: T) => ReactElement<typeof TableRow>;
 
-    configureModal(e: React.MouseEvent<Element, MouseEvent>, entity: T = this.entityGenerator()) {
+    protected abstract initState(): S
+
+    protected abstract initService(): R
+
+    protected abstract initModal(): ReactElement<M>
+
+    protected configureModal(entity: T = this.entityGenerator()): void {
         if (!this.entityModalRef.current) {
             console.log("Error: Modal is null");
             return;
         }
         this.entityModalRef.current.setState({
-            entity: entity
+            entity: this.entityService.clone(entity)
         });
         this.entityModalRef.current.open();
     }
 
+    protected abstract entityGenerator(): T
 
+    protected onSaveEntity(entity: T) {
+        let entities: T[] = this.state.entities;
+
+        let idx = entities.findIndex(e => e.id === entity.id);
+        entities[idx] = entity;
+
+        this.setState({
+            entities: entities
+        })
+    };
 }
